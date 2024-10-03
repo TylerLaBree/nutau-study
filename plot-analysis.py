@@ -31,8 +31,8 @@ fig.suptitle('Distribution of Variables for Different Neutrino Interactions')
 for i, (label, path) in enumerate(files.items()):
     with uproot.open(path) as f:
         tree = f['NeutrinoData']
-        arrays = tree.arrays(filter_name=branches + ['ParticleEnergies', 'include', 'leptonCount', 'negPionCount', 'weight'], library='ak')
-        include_mask = (arrays['include'] == 1) & (arrays['leptonCount'] == 0) & (arrays['negPionCount'] > 0)
+        arrays = tree.arrays(filter_name=branches + ['ParticleEnergies', 'leptonCount', 'negPionCount', 'weight'], library='ak')
+        include_mask = (arrays['leptonCount'] == 0) & (arrays['negPionCount'] > 0)
         
         # Use Awkward Array to handle jagged array of energies
         initial_neutrino_energy = arrays['ParticleEnergies'][:, 0]  # Get the first energy for each event

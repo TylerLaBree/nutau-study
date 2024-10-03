@@ -3,6 +3,7 @@
 #include <map>
 #include <iostream>
 #include <string>
+#include <stdexcept>
 #include <TFile.h>
 #include <TTree.h>
 #include <TChain.h>
@@ -89,8 +90,7 @@ bool isNuclearCode(int pdgCode) {
 }
 
 bool isFinalState(int statusCode) {
-    if (statusCode == 1 || statusCode == 15) return true;
-    return false;
+    return (statusCode == 1 || statusCode == 15);
 }
 
 bool isVisibleAndSufficientEnergy(int pdgCode, int statusCode, double energy) {
@@ -115,14 +115,14 @@ bool isVisibleAndSufficientEnergy(int pdgCode, int statusCode, double energy) {
 }
 
 // Helper function to map flavor and cc to histogram name
-std::string getHistogramName(int flavor, int cc, bool useFunc = false) {
+std::string getHistogramName(int flavor, int cc) {
     std::map<int, std::string> flavorMap = {{12, "nue"}, {14, "numu"}, {16, "nutau"}};
     std::string histName = flavorMap[flavor];
     histName += cc ? "_cc" : "_nc";
     return histName;
 }
 
-void resetCounts(int &leptonCount, int &negPionCount, int &chargedPionCount, double &leadingPionEnergy, double &otherParticleEnergySum, double &missingTransverseMomentum, double &weight, double &weightFunc) {
+void resetCounts(int &leptonCount, int &negPionCount, int &chargedPionCount, double &leadingPionEnergy, double &otherParticleEnergySum, double &missingTransverseMomentum, double &weight) {
     leptonCount = 0;
     negPionCount = 0;
     chargedPionCount = 0;
@@ -130,18 +130,15 @@ void resetCounts(int &leptonCount, int &negPionCount, int &chargedPionCount, dou
     otherParticleEnergySum = 0.0;
     missingTransverseMomentum = 0.0;
     weight = 0.0;
-    weightFunc = 0.0;
 }
 
-void convertRootToAnalysis(const char* inputFileName, const char* outputFileName, int flavor, int cc) {
-    // Open the weights file and histograms
+void convertRootToAnalysis(const char* inputFileName, const char* outputFileName) {
+    // Open the weights file
     TFile* weightsFile = TFile::Open("../nutau-data/weight/weights_flux.root", "READ");
     if (!weightsFile || weightsFile->IsZombie()) {
         std::cerr << "Error opening weights file!" << std::endl;
         return;
     }
-
-    TH1D* weightHist = (TH1D*)weightsFile->Get(getHistogramName(flavor, cc).c_str());
 
     // Open the input file
     TFile *inputFile = new TFile(inputFileName, "READ");
@@ -158,45 +155,55 @@ void convertRootToAnalysis(const char* inputFileName, const char* outputFileName
         return;
     }
 
+    // Read the first entry to determine the histogram to use
+    int initialNeutrinoFlavor, currentType;
+    inputTree->SetBranchAddress("InitialNeutrinoFlavor", &initialNeutrinoFlavor);
+    inputTree->SetBranchAddress("CurrentType", &currentType);
+    inputTree->GetEntry(0);
+    cout << "flavor: " << initialNeutrinoFlavor << " isCC: " << currentType << endl;
+    std::string histogramName = getHistogramName(initialNeutrinoFlavor, currentType);
+    TH1D* weightHist = (TH1D*)weightsFile->Get(histogramName.c_str());
+    if (!weightHist) {
+        std::cerr << "Histogram " << histogramName << " not found!" << std::endl;
+        inputFile->Close();
+        weightsFile->Close();
+        return;
+    }
+
     // Open the output file
     TFile *outputFile = new TFile(outputFileName, "RECREATE");
     if (!outputFile || outputFile->IsZombie()) {
         std::cerr << "Error opening output file!" << std::endl;
         inputFile->Close();
+        weightsFile->Close();
         return;
     }
 
     // Clone the tree structure from input file
     TTree *outputTree = inputTree->CloneTree(0); // Clone with no entries to copy the structure
 
-    // Setup old branches
-    int eventIndex, initialNeutrinoFlavor, isChargedCurrent, particleCount, tauDecayMode;
+    // Setup branches to read from input tree
+    int eventIndex, particleCount;
     std::vector<int>* particlePdgCodes = nullptr;
     std::vector<int>* particleStatusCodes = nullptr;
     std::vector<double>* particleMomentumX = nullptr;
     std::vector<double>* particleMomentumY = nullptr;
     std::vector<double>* particleMomentumZ = nullptr;
     std::vector<double>* particleEnergies = nullptr;
-    std::vector<double>* particleMothers = nullptr;
 
     inputTree->SetBranchAddress("EventIndex", &eventIndex);
-    inputTree->SetBranchAddress("InitialNeutrinoFlavor", &initialNeutrinoFlavor);
-    inputTree->SetBranchAddress("IsChargedCurrent", &isChargedCurrent);
     inputTree->SetBranchAddress("ParticleCount", &particleCount);
-    inputTree->SetBranchAddress("TauDecayMode", &tauDecayMode);
     inputTree->SetBranchAddress("ParticlePdgCodes", &particlePdgCodes);
     inputTree->SetBranchAddress("ParticleStatusCodes", &particleStatusCodes);
     inputTree->SetBranchAddress("ParticleMomentumX", &particleMomentumX);
     inputTree->SetBranchAddress("ParticleMomentumY", &particleMomentumY);
     inputTree->SetBranchAddress("ParticleMomentumZ", &particleMomentumZ);
     inputTree->SetBranchAddress("ParticleEnergies", &particleEnergies);
-    inputTree->SetBranchAddress("ParticleMothers", &particleMothers);
 
-    // Define new branches
-    int include, isVisible, leptonCount, negPionCount, chargedPionCount;
-    double leadingPionEnergy, otherParticleEnergySum, missingTransverseMomentum, weight, weightFunc;
+    // Define variables to be calculated
+    int isVisible, leptonCount, negPionCount, chargedPionCount;
+    double leadingPionEnergy, otherParticleEnergySum, missingTransverseMomentum, weight;
 
-    outputTree->Branch("include", &include, "include/I");
     outputTree->Branch("isVisible", &isVisible, "isVisible/I");
     outputTree->Branch("leptonCount", &leptonCount, "leptonCount/I");
     outputTree->Branch("negPionCount", &negPionCount, "negPionCount/I");
@@ -206,31 +213,23 @@ void convertRootToAnalysis(const char* inputFileName, const char* outputFileName
     outputTree->Branch("missingTransverseMomentum", &missingTransverseMomentum, "missingTransverseMomentum/D");
     outputTree->Branch("weight", &weight, "weight/D");
 
+    // Prepare vector and unit vector definitions for calculations
     UnitVector beamlineDir(beamlineX, beamlineY, beamlineZ);
-    UnitVector referenceDir(1, 0, 0);
-    // Copy data from input tree to output tree, and fill new branches
+    
     Long64_t nentries = inputTree->GetEntries();
-
     for (Long64_t i = 0; i < nentries; i++) {
-        resetCounts(leptonCount, negPionCount, chargedPionCount, leadingPionEnergy, otherParticleEnergySum, missingTransverseMomentum, weight, weightFunc);
         inputTree->GetEntry(i);
-        include = int(isChargedCurrent == cc and initialNeutrinoFlavor == flavor);
 
-        if (!particleEnergies->empty()) {
-            double initialEnergy = (*particleEnergies)[0];  // Assuming the first particle's energy is the neutrino's
-            if (include && (*particlePdgCodes)[0] != flavor) {
-                cout << "error, expected initial nu pdg code " << flavor << ", got " << (*particlePdgCodes)[0] << endl;
-            }
-            int bin = weightHist->FindBin(initialEnergy);
-            weight = weightHist->GetBinContent(bin);
-        }
-
-        Vector3D missingMomentum, totalMomentum;
-        for (size_t j = 0; j < particleCount; ++j) {
+        resetCounts(leptonCount, negPionCount, chargedPionCount, leadingPionEnergy, otherParticleEnergySum, missingTransverseMomentum, weight);
+        double initialEnergy = (*particleEnergies)[0]; // Assuming the first particle's energy is the neutrino's
+        int bin = weightHist->FindBin(initialEnergy);
+        weight = weightHist->GetBinContent(bin);
+        
+        Vector3D missingMomentum;
+        for (size_t j = 0; j < particleCount; j++) {
             isVisible = isVisibleAndSufficientEnergy((*particlePdgCodes)[j], (*particleStatusCodes)[j], (*particleEnergies)[j]) ? 1 : 0;
-
             Vector3D particleMomentum((*particleMomentumX)[j], (*particleMomentumY)[j], (*particleMomentumZ)[j]);
-
+            
             if (isVisible) {
                 if ((*particlePdgCodes)[j] == 11 || (*particlePdgCodes)[j] == -11 || (*particlePdgCodes)[j] == 13 || (*particlePdgCodes)[j] == -13) {
                     leptonCount++;
@@ -241,13 +240,9 @@ void convertRootToAnalysis(const char* inputFileName, const char* outputFileName
                 if ((*particlePdgCodes)[j] == 211 || (*particlePdgCodes)[j] == -211) {
                     chargedPionCount++;
                 }
-                if ((*particlePdgCodes)[j] == -211) {
-                    if ((*particleEnergies)[j] > leadingPionEnergy) {
-                        otherParticleEnergySum += leadingPionEnergy; // Add the previous leading to sum
-                        leadingPionEnergy = (*particleEnergies)[j]; // Update leading energy
-                    } else {
-                        otherParticleEnergySum += (*particleEnergies)[j];
-                    }
+                if ((*particlePdgCodes)[j] == -211 && (*particleEnergies)[j] > leadingPionEnergy) {
+                    otherParticleEnergySum += leadingPionEnergy; // Add the previous leading to sum
+                    leadingPionEnergy = (*particleEnergies)[j]; // Update leading energy
                 } else {
                     otherParticleEnergySum += (*particleEnergies)[j];
                 }
@@ -259,7 +254,7 @@ void convertRootToAnalysis(const char* inputFileName, const char* outputFileName
         outputTree->Fill();
     }
 
-    // Write the output file
+    // Write and close files
     outputTree->Write();
     outputFile->Close();
     inputFile->Close();

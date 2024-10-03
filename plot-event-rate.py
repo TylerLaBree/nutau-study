@@ -18,11 +18,10 @@ def plot_initial_neutrino_energy(files_data, output_filename):
             with uproot.open(path) as f:
                 tree = f['NeutrinoData']
                 # Filtering based on 'include' branch
-                arrays = tree.arrays(filter_name=['ParticleEnergies', 'weight', 'include'], library='ak')
+                arrays = tree.arrays(filter_name=['ParticleEnergies', 'weight'], library='ak')
                 # Apply the filter 'include == 1'
-                filtered_arrays = arrays[arrays['include'] == 1]
-                initial_neutrino_energy = filtered_arrays['ParticleEnergies'][:, 0]  # First energy for each event after filtering
-                weights = filtered_arrays['weight'] * 1.3e-25  # Scaling factor
+                initial_neutrino_energy = arrays['ParticleEnergies'][:, 0]  # First energy for each event after filtering
+                weights = arrays['weight'] * 1.3e-25  # Scaling factor
 
                 ax.hist(initial_neutrino_energy, bins=bins, weights=weights, color=colors[i], histtype="step", linewidth=1.5, label=f'{labels[i]}')
                 ax.set_xlabel('Initial Neutrino Energy [GeV]')
@@ -30,24 +29,24 @@ def plot_initial_neutrino_energy(files_data, output_filename):
                 ax.legend()
 
     plt.tight_layout()
-    plt.savefig(f"../nutau-data/images/{output_filename}")
+    plt.savefig(f"../nutau-data/plots/{output_filename}")
 
 # Data for plots
 data = [
     ('Event rate (hadronic decay)', {
-        'signal': '../nutau-data/machado/new/nu_16_cc.root',
-        '12_nc': '../nutau-data/machado/new/nu_12_nc.root',
-        '14_nc': '../nutau-data/machado/new/nu_14_nc.root',
-        '16_nc': '../nutau-data/machado/new/nu_16_nc.root'
+        'signal': '../nutau-data/analysis/nu_tau_cc.root',
+        '12_nc': '../nutau-data/analysis/nu_e_nc.root',
+        '14_nc': '../nutau-data/analysis/nu_mu_nc.root',
+        '16_nc': '../nutau-data/analysis/nu_tau_nc.root'
     }, ['#EE3311', '#3161F3', '#0F8E17', '#FF9900'], ['$\\tau$ CC (signal)', '$e$ NC (bkg)', '$\mu$ NC (bkg)', '$\\tau$ NC (bkg)']),
 
     ('Event rate (leptonic decay)', {
-        'signal': '../nutau-data/machado/new/nu_16_cc.root',
-        '12_cc': '../nutau-data/machado/new/nu_12_cc.root',
-        '14_cc': '../nutau-data/machado/new/nu_14_cc.root'
+        'signal': '../nutau-data/analysis/nu_tau_cc.root',
+        '12_cc': '../nutau-data/analysis/nu_e_cc.root',
+        '14_cc': '../nutau-data/analysis/nu_mu_cc.root'
     }, ['#EE3311', '#3161F3', '#0F8E17'], ['$\\tau$ CC (signal)', '$e$ CC (bkg)', '$\mu$ CC (bkg)'])
 ]
 
 # Generate multiplots
-plot_initial_neutrino_energy(data, 'event-rates-combined.png')
+plot_initial_neutrino_energy(data, 'event-rates.svg')
 

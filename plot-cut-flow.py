@@ -3,12 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # File paths
-signal_file = '../nutau-data/machado/new/nu_16_cc.root'
+signal_file = '../nutau-data/analysis/nu_tau_cc.root'
 
 background_files = [
-    '../nutau-data/machado/new/nu_12_nc.root',
-    '../nutau-data/machado/new/nu_14_nc.root',
-    '../nutau-data/machado/new/nu_16_nc.root'
+    '../nutau-data/analysis/nu_e_nc.root',
+    '../nutau-data/analysis/nu_mu_nc.root',
+    '../nutau-data/analysis/nu_tau_nc.root'
 ]
 
 # Branches to read
@@ -101,5 +101,5 @@ plt.xlabel('Cuts Applied')
 plt.ylabel('Efficiency Ratio (Signal / Background)')
 plt.title('Efficiency Ratio vs. Cumulative Cuts')
 plt.tight_layout()
-plt.savefig("../nutau-data/images/cut-flow.svg")
+plt.savefig("../nutau-data/plots/cut-flow.svg")
 

@@ -76,8 +76,7 @@ int identifyInteractionType(const simb::MCTruth& truth) {
     else if (mode == 10) return 4; // MEC
     return 5; // Other interactions
 }
-
-void convertArtToRoot(const std::string& inputDirectory, const std::string& outputFilePath) {
+void convertArtToRoot(const std::string& inputDirectory, const std::string& outputFilePath, int requiredCurrentType, int requiredNeutrinoPdgCode) {
     std::vector<std::string> fileNames = gatherRootFilePaths(inputDirectory);
 
     if (fileNames.empty()) {
@@ -91,7 +90,7 @@ void convertArtToRoot(const std::string& inputDirectory, const std::string& outp
 
     int eventIndex;
     int initialNeutrinoFlavor;
-    int isChargedCurrent;  // Now int: 0 for NC, 1 for CC
+    int currentType;  // 0 for NC, 1 for CC
     int tauDecayMode;
     int interactionType;
     int particleCount;
@@ -105,7 +104,7 @@ void convertArtToRoot(const std::string& inputDirectory, const std::string& outp
 
     dataTree->Branch("EventIndex", &eventIndex);
     dataTree->Branch("InitialNeutrinoFlavor", &initialNeutrinoFlavor);
-    dataTree->Branch("IsChargedCurrent", &isChargedCurrent);
+    dataTree->Branch("CurrentType", &currentType);
     dataTree->Branch("TauDecayMode", &tauDecayMode);
     dataTree->Branch("InteractionType", &interactionType);
     dataTree->Branch("ParticleCount", &particleCount);
@@ -133,7 +132,13 @@ void convertArtToRoot(const std::string& inputDirectory, const std::string& outp
             for (const auto& truth : *mcTruthHandle) {
                 eventIndex = events.eventAuxiliary().event();
                 initialNeutrinoFlavor = truth.GetNeutrino().Nu().PdgCode();
-                isChargedCurrent = !truth.GetNeutrino().CCNC();
+                currentType = !truth.GetNeutrino().CCNC();  // 0 for NC, 1 for CC
+
+                // Skip events not matching the criteria
+                if ((requiredCurrentType != currentType) || (initialNeutrinoFlavor != requiredNeutrinoPdgCode)) {
+                    continue;
+                }
+
                 std::vector<int> decayProducts = identifyDecayProducts(truth);
                 tauDecayMode = identifyTauDecayMode(decayProducts);
                 interactionType = identifyInteractionType(truth);

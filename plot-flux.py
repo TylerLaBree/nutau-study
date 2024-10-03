@@ -26,14 +26,14 @@ def plot_flux_histograms(file_path, hist_names, colors, labels, plot_title, outp
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig(f"../nutau-data/images/{output_filename}")
+    plt.savefig(f"../nutau-data/plots/{output_filename}")
 
 # File and histogram details
-file_path = '../nutau-data/rate/flux_dune_neutrino_FD.root'
+file_path = '../nutau-data/weight/flux_dune_neutrino_FD.root'
 hist_names = ['nutau_fluxosc', 'numu_fluxosc', 'nue_fluxosc']
 colors = ['#EE3311', '#0F8E17', '#3161F3']  # Colors corresponding to 14_nc, 12_nc, and 16_cc
 labels = ['$\\nu_\\tau$ flux (oscillated)', '$\\nu_\\mu$ flux (oscillated)', '$\\nu_e$ flux (oscillated)']
 
 # Generate plot
-plot_flux_histograms(file_path, hist_names, colors, labels, 'Normalized Neutrino Flux at DUNE', 'normalized-neutrino-flux-dune.png')
+plot_flux_histograms(file_path, hist_names, colors, labels, 'Normalized Neutrino Flux at DUNE', 'flux.svg')
 
