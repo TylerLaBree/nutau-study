@@ -80,7 +80,7 @@ int identifyInteractionType(const simb::MCTruth& truth) {
     return 5; // Other interactions
 }
 
-void convertArtToRoot(const std::string& inputDirectory, const std::string& outputFilePath, int requiredCurrentType, int requiredNeutrinoPdgCode) {
+void convertArtToRootReco(const std::string& inputDirectory, const std::string& outputFilePath, int requiredCurrentType, int requiredNeutrinoPdgCode) {
     std::vector<std::string> fileNames = gatherRootFilePaths(inputDirectory);
 
     if (fileNames.empty()) {
