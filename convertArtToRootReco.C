@@ -122,22 +122,22 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
     dataTree->Branch("ParticleMothers", &particleMothers);
 
     // Reco branches
-    int recoParticleIndices;
-    int recoParticlePDGCodes;
-    float recoParticleMomentumXs;
-    float recoParticleMomentumYs;
-    float recoParticleMomentumZs;
-    float recoParticleTrackLengths;
+    std::vector<int> recoParticleIndices;
+    std::vector<int> recoParticlePdgCodes;
+    std::vector<float> recoParticleMomentumX;
+    std::vector<float> recoParticleMomentumY;
+    std::vector<float> recoParticleMomentumZ;
+    std::vector<float> recoParticleTrackLengths;
 
-    int recoShowerIndices;
-    float recoShowerEnergies;
-    float recoShowerLengths;
+    std::vector<int> recoShowerIndices;
+    std::vector<float> recoShowerEnergies;
+    std::vector<float> recoShowerLengths;
 
     dataTree->Branch("RecoParticleIndices", &recoParticleIndices);
-    dataTree->Branch("RecoParticlePDGCodes", &recoParticlePDGCodes);
-    dataTree->Branch("RecoParticleMomentumXs", &recoParticleMomentumXs);
-    dataTree->Branch("RecoParticleMomentumYs", &recoParticleMomentumYs);
-    dataTree->Branch("RecoParticleMomentumZs", &recoParticleMomentumZs);
+    dataTree->Branch("RecoParticlePdgCodes", &recoParticlePdgCodes);
+    dataTree->Branch("RecoParticleMomentumX", &recoParticleMomentumX);
+    dataTree->Branch("RecoParticleMomentumY", &recoParticleMomentumY);
+    dataTree->Branch("RecoParticleMomentumZ", &recoParticleMomentumZ);
     dataTree->Branch("RecoParticleTrackLengths", &recoParticleTrackLengths);
 
     dataTree->Branch("RecoShowerIndices", &recoShowerIndices);
@@ -188,32 +188,39 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
         }
 
         // Reco data handling
+        recoParticleIndices.clear();
+        recoParticlePdgCodes.clear();
+        recoParticleMomentumX.clear();
+        recoParticleMomentumY.clear();
+        recoParticleMomentumZ.clear();
+        recoParticleTrackLengths.clear();
+
+        recoShowerIndices.clear();
+        recoShowerEnergies.clear();
+        recoShowerLengths.clear();
+
         gallery::Handle<std::vector<recob::PFParticle>> pfParticleHandle;
         events.getByLabel("pandora", pfParticleHandle);
 
         if (pfParticleHandle.isValid()) {
             for (const auto& pfParticle : *pfParticleHandle) {
-                eventIndex = events.eventAuxiliary().event();
-                recoParticleIndices = pfParticle.Self();
-                recoParticlePDGCodes = pfParticle.PdgCode();
+                recoParticleIndices.push_back(pfParticle.Self());
+                recoParticlePdgCodes.push_back(pfParticle.PdgCode());
 
                 // Attempt to get the associated track
                 gallery::Handle<std::vector<recob::Track>> trackHandle;
                 events.getByLabel("pandoraTrack", trackHandle);
                 if (trackHandle.isValid()) {
                     for (const auto& track : *trackHandle) {
-                        if (track.ID() == recoParticleIndices) { // Assume the track ID matches PFParticle ID
-                            recoParticleTrackLengths = track.Length();
-                            recoParticleMomentumXs = track.VertexMomentumVector().X();
-                            recoParticleMomentumYs = track.VertexMomentumVector().Y();
-                            recoParticleMomentumZs = track.VertexMomentumVector().Z();
+                        if (track.ID() == pfParticle.Self()) { // Assume the track ID matches PFParticle ID
+                            recoParticleTrackLengths.push_back(track.Length());
+                            recoParticleMomentumX.push_back(track.VertexMomentumVector().X());
+                            recoParticleMomentumY.push_back(track.VertexMomentumVector().Y());
+                            recoParticleMomentumZ.push_back(track.VertexMomentumVector().Z());
                             break;
                         }
                     }
                 }
-
-                // Save reconstructed particle data
-                dataTree->Fill();
             }
         }
 
@@ -222,12 +229,14 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
         events.getByLabel("pandoraShower", showerHandle);
         if (showerHandle.isValid()) {
             for (const auto& shower : *showerHandle) {
-                recoShowerIndices = shower.ID();
-                recoShowerEnergies = shower.Energy()[0]; // Assuming the first element is the energy
-                recoShowerLengths = shower.Length();
-                dataTree->Fill();
+                recoShowerIndices.push_back(shower.ID());
+                recoShowerEnergies.push_back(shower.Energy()[0]); // Assuming the first element is the energy
+                recoShowerLengths.push_back(shower.Length());
             }
         }
+
+        // Save reconstructed data
+        dataTree->Fill();
 
         events.next(); // Move to the next event
     }
