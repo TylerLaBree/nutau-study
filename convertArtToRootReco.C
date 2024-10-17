@@ -128,6 +128,7 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
     std::vector<float> recoParticleMomentumY;
     std::vector<float> recoParticleMomentumZ;
     std::vector<float> recoParticleTrackLengths;
+    std::vector<int> recoParticleStatusCodes;
 
     std::vector<int> recoShowerIndices;
     std::vector<float> recoShowerEnergies;
@@ -139,6 +140,7 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
     dataTree->Branch("RecoParticleMomentumY", &recoParticleMomentumY);
     dataTree->Branch("RecoParticleMomentumZ", &recoParticleMomentumZ);
     dataTree->Branch("RecoParticleTrackLengths", &recoParticleTrackLengths);
+    dataTree->Branch("RecoParticleStatusCodes", &recoParticleStatusCodes);
 
     dataTree->Branch("RecoShowerIndices", &recoShowerIndices);
     dataTree->Branch("RecoShowerEnergies", &recoShowerEnergies);
@@ -190,6 +192,7 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
         // Reco data handling
         recoParticleIndices.clear();
         recoParticlePdgCodes.clear();
+        recoParticleStatusCodes.clear();
         recoParticleMomentumX.clear();
         recoParticleMomentumY.clear();
         recoParticleMomentumZ.clear();
@@ -206,6 +209,7 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
             for (const auto& pfParticle : *pfParticleHandle) {
                 recoParticleIndices.push_back(pfParticle.Self());
                 recoParticlePdgCodes.push_back(pfParticle.PdgCode());
+                recoParticleStatusCodes.push_back(pfParticle.IsPrimary() ? 1 : 0);
 
                 // Attempt to get the associated track
                 gallery::Handle<std::vector<recob::Track>> trackHandle;
