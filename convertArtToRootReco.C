@@ -1,9 +1,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <dirent.h> // Directory handling
+#include <dirent.h>
 
-// Gallery and nutools includes to read art files
 #include "gallery/Event.h"
 #include "gallery/Handle.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -11,11 +10,9 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Shower.h"
 
-// ROOT includes
 #include "TFile.h"
 #include "TTree.h"
 
-// Helper function to gather .root file paths from a directory
 std::vector<std::string> gatherRootFilePaths(const std::string& directoryPath) {
     std::vector<std::string> rootFilePaths;
     DIR* dir;
@@ -79,7 +76,6 @@ int identifyInteractionType(const simb::MCTruth& truth) {
     else if (mode == 10) return 4; // MEC
     return 5; // Other interactions
 }
-
 void convertArtToRootReco(const std::string& inputDirectory, const std::string& outputFilePath, int requiredCurrentType, int requiredNeutrinoPdgCode) {
     std::vector<std::string> fileNames = gatherRootFilePaths(inputDirectory);
 
@@ -121,7 +117,7 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
     dataTree->Branch("ParticleEnergies", &particleEnergies);
     dataTree->Branch("ParticleMothers", &particleMothers);
 
-    // Reco branches
+    // Reconstruction branches
     std::vector<int> recoParticleIndices;
     std::vector<int> recoParticlePdgCodes;
     std::vector<float> recoParticleMomentumX;
@@ -147,6 +143,30 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
     dataTree->Branch("RecoShowerLengths", &recoShowerLengths);
 
     while (!events.atEnd()) {
+        gallery::Handle<std::vector<simb::MCTruth>> mcTruthHandle;
+        events.getByLabel("generator", mcTruthHandle);
+
+        bool eventMatchesCriteria = false;
+
+        if (mcTruthHandle.isValid()) {
+            for (const auto& truth : *mcTruthHandle) {
+                initialNeutrinoFlavor = truth.GetNeutrino().Nu().PdgCode();
+                currentType = !truth.GetNeutrino().CCNC();  // 0 for NC, 1 for CC
+
+                // Check if the event matches the required criteria
+                if ((requiredCurrentType == currentType) && (initialNeutrinoFlavor == requiredNeutrinoPdgCode)) {
+                    eventMatchesCriteria = true;
+                    break; // No need to check further, one matching truth is enough
+                }
+            }
+        }
+
+        // Skip the entire event if no truth matches the criteria
+        if (!eventMatchesCriteria) {
+            events.next();
+            continue;
+        }
+
         particlePdgCodes.clear();
         particleStatusCodes.clear();
         particleMomentumX.clear();
@@ -155,19 +175,23 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
         particleEnergies.clear();
         particleMothers.clear();
 
-        gallery::Handle<std::vector<simb::MCTruth>> mcTruthHandle;
-        events.getByLabel("generator", mcTruthHandle);
+        recoParticleIndices.clear();
+        recoParticlePdgCodes.clear();
+        recoParticleStatusCodes.clear();
+        recoParticleMomentumX.clear();
+        recoParticleMomentumY.clear();
+        recoParticleMomentumZ.clear();
+        recoParticleTrackLengths.clear();
+        recoShowerIndices.clear();
+        recoShowerEnergies.clear();
+        recoShowerLengths.clear();
 
+        // Fill truth data if matches criteria
         if (mcTruthHandle.isValid()) {
             for (const auto& truth : *mcTruthHandle) {
                 eventIndex = events.eventAuxiliary().event();
                 initialNeutrinoFlavor = truth.GetNeutrino().Nu().PdgCode();
                 currentType = !truth.GetNeutrino().CCNC();  // 0 for NC, 1 for CC
-
-                // Skip events not matching the criteria
-                if ((requiredCurrentType != currentType) || (initialNeutrinoFlavor != requiredNeutrinoPdgCode)) {
-                    continue;
-                }
 
                 std::vector<int> decayProducts = identifyDecayProducts(truth);
                 tauDecayMode = identifyTauDecayMode(decayProducts);
@@ -184,24 +208,10 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
                     particleEnergies.push_back(particle.Momentum().E());
                     particleMothers.push_back(particle.Mother());
                 }
-
-                dataTree->Fill();
             }
         }
 
-        // Reco data handling
-        recoParticleIndices.clear();
-        recoParticlePdgCodes.clear();
-        recoParticleStatusCodes.clear();
-        recoParticleMomentumX.clear();
-        recoParticleMomentumY.clear();
-        recoParticleMomentumZ.clear();
-        recoParticleTrackLengths.clear();
-
-        recoShowerIndices.clear();
-        recoShowerEnergies.clear();
-        recoShowerLengths.clear();
-
+        // Handle reco data if matches criteria
         gallery::Handle<std::vector<recob::PFParticle>> pfParticleHandle;
         events.getByLabel("pandora", pfParticleHandle);
 
@@ -228,7 +238,6 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
             }
         }
 
-        // Save all showers
         gallery::Handle<std::vector<recob::Shower>> showerHandle;
         events.getByLabel("pandoraShower", showerHandle);
         if (showerHandle.isValid()) {
@@ -239,12 +248,11 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
             }
         }
 
-        // Save reconstructed data
         dataTree->Fill();
-
-        events.next(); // Move to the next event
+        events.next();
     }
     dataTree->Write();
     outputFile->Close();
     delete outputFile;
 }
+
