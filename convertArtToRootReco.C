@@ -10,6 +10,11 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Shower.h"
 
+#include "canvas/Persistency/Common/FindOneP.h"
+#include "canvas/Persistency/Common/Assns.h"
+#include "larcoreobj/SimpleTypesAndConstants/geo_vectors.h"
+#include "dunereco/AnaUtils/DUNEAnaPFParticleUtils.h"
+
 #include "TFile.h"
 #include "TTree.h"
 
@@ -211,7 +216,6 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
             }
         }
 
-        // Handle reco data if matches criteria
         gallery::Handle<std::vector<recob::PFParticle>> pfParticleHandle;
         events.getByLabel("pandora", pfParticleHandle);
 
@@ -221,18 +225,15 @@ void convertArtToRootReco(const std::string& inputDirectory, const std::string& 
                 recoParticlePdgCodes.push_back(pfParticle.PdgCode());
                 recoParticleStatusCodes.push_back(pfParticle.IsPrimary() ? 1 : 0);
 
-                // Attempt to get the associated track
-                gallery::Handle<std::vector<recob::Track>> trackHandle;
-                events.getByLabel("pandoraTrack", trackHandle);
-                if (trackHandle.isValid()) {
-                    for (const auto& track : *trackHandle) {
-                        if (track.ID() == pfParticle.Self()) { // Assume the track ID matches PFParticle ID
-                            recoParticleTrackLengths.push_back(track.Length());
-                            recoParticleMomentumX.push_back(track.VertexMomentumVector().X());
-                            recoParticleMomentumY.push_back(track.VertexMomentumVector().Y());
-                            recoParticleMomentumZ.push_back(track.VertexMomentumVector().Z());
-                            break;
-                        }
+                art::FindOneP<recob::Track> trackAssn(pfParticleHandle, events, "pandoraTrack");
+                if (trackAssn.isValid() && trackAssn.at(pfParticle.Self())) {
+                    auto trackPtr = trackAssn.at(pfParticle.Self());
+                    const recob::Track& track = *trackPtr;
+                    if (trackPtr.isAvailable()) {
+                        recoParticleTrackLengths.push_back(track.Length());
+                        recoParticleMomentumX.push_back(track.VertexMomentumVector().X());
+                        recoParticleMomentumY.push_back(track.VertexMomentumVector().Y());
+                        recoParticleMomentumZ.push_back(track.VertexMomentumVector().Z());
                     }
                 }
             }
